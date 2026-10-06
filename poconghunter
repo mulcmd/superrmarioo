@@ -1,0 +1,1200 @@
+```html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pocong Hunter - Petualangan Mistik 2D</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Poppins:wght@400;600;800&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #050508;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .font-creepster {
+            font-family: 'Creepster', cursive;
+        }
+
+        /* Responsive Canvas Aspect Ratio Container */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1280px;
+            max-height: 720px;
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 0 50px rgba(0, 255, 128, 0.2);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0c10;
+        }
+
+        /* Screen Shake Animation */
+        .shake {
+            animation: shakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate3d(-3px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* Touch Controls Styling */
+        .btn-touch {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            active: background rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-slate-950 text-white">
+
+    <!-- GAME CONTAINER -->
+    <div id="game-container" class="relative rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center">
+
+        <!-- CANVAS GAME -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- IN-GAME HUD -->
+        <div id="hud" class="absolute top-0 left-0 right-0 p-3 flex justify-between items-start pointer-events-none hidden z-10">
+            <!-- Left Info: HP & Status -->
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur">
+                    <span class="text-xs font-bold text-red-400">DARAH:</span>
+                    <div class="w-32 md:w-48 bg-slate-800 h-4 rounded-full overflow-hidden border border-slate-600">
+                        <div id="hp-bar" class="bg-gradient-to-r from-red-600 to-emerald-400 h-full w-full transition-all duration-200"></div>
+                    </div>
+                    <span id="hp-text" class="text-xs font-bold">100</span>
+                </div>
+                <!-- Active Powerup Badge -->
+                <div id="powerup-badge" class="hidden text-xs bg-amber-500/80 text-black font-extrabold px-2 py-0.5 rounded shadow animate-pulse w-max">
+                    JIMAT MISTIK (2X SERANGAN)
+                </div>
+            </div>
+
+            <!-- Center Info: Boss HP (Hidden by default) -->
+            <div id="boss-hud" class="hidden flex-col items-center w-1/3 bg-red-950/80 p-2 rounded-lg border border-red-600 backdrop-blur">
+                <span id="boss-name" class="text-xs md:text-sm font-bold text-red-400 tracking-wider font-creepster">KING POCONG RAKSASA</span>
+                <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden border border-red-800 mt-1">
+                    <div id="boss-hp-bar" class="bg-red-600 h-full w-full transition-all duration-150"></div>
+                </div>
+            </div>
+
+            <!-- Right Info: Score, Level, Enemies -->
+            <div class="flex flex-col items-end gap-1">
+                <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur text-right">
+                    <div class="text-xs text-slate-400">LEVEL: <span id="level-display" class="text-emerald-400 font-bold">1</span></div>
+                    <div class="text-sm md:text-lg font-bold text-amber-400">SKOR: <span id="score-display">0</span></div>
+                    <div class="text-xs text-slate-300">POCONG: <span id="enemy-display" class="text-red-400 font-bold">0/0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOBILE TOUCH CONTROLS OVERLAY -->
+        <div id="touch-controls" class="absolute bottom-2 left-0 right-0 p-3 flex justify-between items-end pointer-events-none z-20 md:hidden hidden">
+            <!-- D-Pad Left/Right -->
+            <div class="flex gap-2 pointer-events-auto">
+                <button id="btn-left" class="btn-touch w-14 h-14 rounded-full flex items-center justify-center text-2xl active:bg-emerald-600/50">◀</button>
+                <button id="btn-right" class="btn-touch w-14 h-14 rounded-full flex items-center justify-center text-2xl active:bg-emerald-600/50">▶</button>
+            </div>
+
+            <!-- Action Buttons: Jump & Shoot -->
+            <div class="flex gap-3 pointer-events-auto">
+                <button id="btn-jump" class="btn-touch w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold active:bg-blue-600/50">⬆</button>
+                <button id="btn-shoot" class="btn-touch w-16 h-16 rounded-full bg-red-600/60 border-2 border-red-400 flex items-center justify-center text-2xl active:bg-red-500">🔥</button>
+            </div>
+        </div>
+
+        <!-- MAIN MENU OVERLAY -->
+        <div id="menu-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30">
+            <h1 class="text-5xl md:text-7xl font-creepster text-red-600 tracking-wider text-center drop-shadow-[0_5px_15px_rgba(239,68,68,0.5)] mb-2">POCONG HUNTER</h1>
+            <p class="text-slate-400 text-sm md:text-base mb-6 text-center max-w-md">Basmi ancaman hantu mistis di malam hari dengan senjatamu! Naik tingkat dan kalahkan Raja Pocong!</p>
+            
+            <div class="flex flex-col gap-3 w-full max-w-xs">
+                <button id="start-btn" class="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-6 rounded-xl shadow-lg transform hover:scale-105 transition-all text-center">
+                    MULAI PETUALANGAN
+                </button>
+                <button id="howto-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-semibold py-2.5 px-6 rounded-xl transition-all">
+                    Cara Bermain
+                </button>
+                <div class="flex justify-between items-center bg-slate-900 px-4 py-2 rounded-xl border border-slate-800 mt-2">
+                    <span class="text-xs text-slate-400">High Score:</span>
+                    <span id="highscore-display" class="text-amber-400 font-bold">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- HOW TO PLAY MODAL -->
+        <div id="howto-modal" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 z-40 hidden">
+            <h2 class="text-2xl md:text-3xl font-bold text-emerald-400 mb-4 font-creepster tracking-wide">PANDUAN PEMBURU</h2>
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 max-w-md text-xs md:text-sm text-slate-300 space-y-3 mb-6">
+                <p>🧟 <strong>Keyboard (Desktop):</strong> A / D atau Panah Kanan/Kiri untuk bergerak, W / Panah Atas / Space untuk melompat. Tekan J / K / Klik Mouse untuk menembak peluru mistis.</p>
+                <p>📱 <strong>Mobile / Touch:</strong> Gunakan tombol D-Pad di layar untuk bergerak, melompat, dan menembak.</p>
+                <p>🧪 <strong>Power-Up:</strong></p>
+                <ul class="list-disc list-inside text-slate-400 pl-2">
+                    <li><span class="text-emerald-400 font-bold">Kemenyan:</span> Memulihkan HP Pemburu.</li>
+                    <li><span class="text-amber-400 font-bold">Jimat Mistik:</span> Meningkatkan daya hancur peluru 2x lipat!</li>
+                </ul>
+                <p>👻 <strong>Musuh:</strong> Pocong Putih, Pocong Merah Cepat, Kuntilanak Terbang, & Raja Pocong di Level 3!</p>
+            </div>
+            <button id="close-howto-btn" class="bg-slate-800 hover:bg-slate-700 px-6 py-2 rounded-lg font-bold border border-slate-600">
+                Kembali
+            </button>
+        </div>
+
+        <!-- GAME OVER OVERLAY -->
+        <div id="gameover-overlay" class="absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-40 hidden">
+            <h2 class="text-5xl font-creepster text-red-500 mb-2 tracking-wider animate-bounce">KAMU GUGUR!</h2>
+            <p class="text-slate-300 mb-4 text-center">Arwah mistis telah mengalahkanmu di kegelapan malam...</p>
+            <div class="bg-slate-900/90 p-4 rounded-xl border border-red-900/50 mb-6 w-full max-w-xs text-center">
+                <div class="text-xs text-slate-400">SKOR AKHIR</div>
+                <div id="final-score" class="text-3xl font-bold text-amber-400 mb-2">0</div>
+                <div class="text-xs text-slate-400">LEVEL TERAKHIR: <span id="final-level" class="text-emerald-400 font-bold">1</span></div>
+            </div>
+            <button id="restart-btn" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105">
+                COBA LAGI
+            </button>
+        </div>
+
+        <!-- LEVEL CLEAR / VICTORY MODAL -->
+        <div id="victory-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-40 hidden">
+            <h2 id="victory-title" class="text-4xl md:text-5xl font-creepster text-emerald-400 mb-2 text-center">LEVEL SELESAI!</h2>
+            <p id="victory-msg" class="text-slate-300 mb-6 text-center max-w-sm">Area ini telah bersih dari hantu. Persiapkan dirimu untuk area berikutnya!</p>
+            <div id="stars-container" class="flex gap-2 text-3xl mb-6">
+                <span>⭐</span><span>⭐</span><span>⭐</span>
+            </div>
+            <button id="next-level-btn" class="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105">
+                LANJUTKAN LEVEL
+            </button>
+        </div>
+
+        <!-- MUTE / UNMUTE SOUND TOGGLE -->
+        <button id="sound-btn" class="absolute top-3 right-3 z-30 bg-slate-900/80 p-2 rounded-lg border border-slate-700 text-sm backdrop-blur">
+            🔊 Sound: ON
+        </button>
+
+    </div>
+
+    <script>
+        /* -------------------------------------------------------------
+           WEB AUDIO API SYNTHESIZER (No external sound files required)
+           ------------------------------------------------------------- */
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.bgmTimer = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playShoot() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playJump() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playHit() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            playEnemyDeath() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playPowerup() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playVictory() {
+                if (this.muted || !this.ctx) return;
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.12);
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime + idx * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.12 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.12);
+                    osc.stop(this.ctx.currentTime + idx * 0.12 + 0.3);
+                });
+            }
+
+            playGameOver() {
+                if (this.muted || !this.ctx) return;
+                const notes = [200, 150, 100, 60];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.18);
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime + idx * 0.18);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.18 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.18);
+                    osc.stop(this.ctx.currentTime + idx * 0.18 + 0.3);
+                });
+            }
+
+            startBGM() {
+                if (this.bgmTimer || this.muted) return;
+                let step = 0;
+                // Spooky Chiptune BGM sequence
+                const scale = [110, 116.54, 130.81, 123.47, 110, 98, 123.47, 87.31];
+                this.bgmTimer = setInterval(() => {
+                    if (this.muted || !this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(scale[step % scale.length], this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.22);
+                    step++;
+                }, 250);
+            }
+
+            stopBGM() {
+                if (this.bgmTimer) {
+                    clearInterval(this.bgmTimer);
+                    this.bgmTimer = null;
+                }
+            }
+        }
+
+        const sounds = new SoundSystem();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+
+        // Internal Game Dimensions (Virtual Canvas 16:9)
+        const GAME_WIDTH = 960;
+        const GAME_HEIGHT = 540;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        // Game State Variables
+        let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER, VICTORY
+        let currentLevel = 1;
+        let score = 0;
+        let highScore = localStorage.getItem('pocong_hunter_highscore') || 0;
+        document.getElementById('highscore-display').innerText = highScore;
+
+        // Key State Tracker
+        const keys = {
+            left: false,
+            right: false,
+            up: false,
+            shoot: false
+        };
+
+        // Screen Shake Controller
+        let shakeTime = 0;
+        function triggerScreenShake() {
+            gameContainer.classList.add('shake');
+            setTimeout(() => gameContainer.classList.remove('shake'), 300);
+        }
+
+        /* -------------------------------------------------------------
+           GAME LEVEL CONFIGURATIONS
+           ------------------------------------------------------------- */
+        const LEVEL_CONFIGS = {
+            1: {
+                name: 'Hutan Bambu Mistis',
+                bgColor: '#08140e',
+                fogColor: 'rgba(16, 44, 28, 0.4)',
+                enemyCount: 8,
+                types: ['POCONG_WHITE'],
+                boss: false
+            },
+            2: {
+                name: 'Kuburan Tua Kuno',
+                bgColor: '#120b18',
+                fogColor: 'rgba(38, 20, 52, 0.4)',
+                enemyCount: 12,
+                types: ['POCONG_WHITE', 'POCONG_RED', 'KUNTILANAK'],
+                boss: false
+            },
+            3: {
+                name: 'Desa Terbengkalai - Sarang Raja Pocong',
+                bgColor: '#1a0505',
+                fogColor: 'rgba(50, 10, 10, 0.5)',
+                enemyCount: 6,
+                types: ['POCONG_RED', 'KUNTILANAK'],
+                boss: true
+            }
+        };
+
+        /* -------------------------------------------------------------
+           PLAYER CLASS
+           ------------------------------------------------------------- */
+        class Player {
+            constructor() {
+                this.w = 36;
+                this.h = 60;
+                this.x = 80;
+                this.y = GAME_HEIGHT - 120 - this.h;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 4.5;
+                this.jumpForce = -11.5;
+                this.gravity = 0.5;
+                this.isGrounded = false;
+                this.facing = 'right';
+                this.hp = 100;
+                this.maxHp = 100;
+                this.shootCooldown = 0;
+                this.powerupTimer = 0; // Double damage timer
+            }
+
+            reset() {
+                this.x = 80;
+                this.y = GAME_HEIGHT - 120 - this.h;
+                this.vx = 0;
+                this.vy = 0;
+                this.hp = 100;
+                this.powerupTimer = 0;
+                this.shootCooldown = 0;
+            }
+
+            update() {
+                // Horizontal Movement
+                if (keys.left) {
+                    this.vx = -this.speed;
+                    this.facing = 'left';
+                } else if (keys.right) {
+                    this.vx = this.speed;
+                    this.facing = 'right';
+                } else {
+                    this.vx *= 0.7;
+                }
+
+                // Jump
+                if (keys.up && this.isGrounded) {
+                    this.vy = this.jumpForce;
+                    this.isGrounded = false;
+                    sounds.playJump();
+                }
+
+                // Gravity & Position Updates
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Screen Boundaries & Ground Collision
+                const groundY = GAME_HEIGHT - 80;
+                if (this.y + this.h >= groundY) {
+                    this.y = groundY - this.h;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                }
+
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.w > GAME_WIDTH) this.x = GAME_WIDTH - this.w;
+
+                // Cooldowns & Timers
+                if (this.shootCooldown > 0) this.shootCooldown--;
+                if (this.powerupTimer > 0) this.powerupTimer--;
+
+                // Shooting Logic
+                if (keys.shoot && this.shootCooldown <= 0) {
+                    const bulletVx = this.facing === 'right' ? 12 : -12;
+                    const damage = this.powerupTimer > 0 ? 30 : 15;
+                    bullets.push(new Bullet(this.x + (this.facing === 'right' ? this.w : 0), this.y + 22, bulletVx, damage));
+                    this.shootCooldown = 12;
+                    sounds.playShoot();
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                if (this.facing === 'left') ctx.scale(-1, 1);
+
+                // Body (Pemburu Coat)
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.roundRect(-16, -10, 32, 38, 6);
+                ctx.fill();
+
+                // Belt & Details
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(-16, 8, 32, 5);
+
+                // Head & Hat
+                ctx.fillStyle = '#fcd34d'; // Skin
+                ctx.beginPath();
+                ctx.arc(0, -18, 12, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Hunter Cap
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(-16, -28, 32, 8);
+                ctx.fillRect(-12, -32, 24, 6);
+
+                // Mystical Torch / Gun Weapon
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(8, 0, 18, 6);
+                // Fire Tip
+                ctx.fillStyle = this.powerupTimer > 0 ? '#f59e0b' : '#ef4444';
+                ctx.beginPath();
+                ctx.arc(26, 3, 5 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           BULLET CLASS
+           ------------------------------------------------------------- */
+        class Bullet {
+            constructor(x, y, vx, damage) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.damage = damage;
+                this.radius = 5;
+                this.active = true;
+            }
+
+            update() {
+                this.x += this.vx;
+                if (this.x < 0 || this.x > GAME_WIDTH) this.active = false;
+
+                // Spawn Trail Particles
+                particles.push(new Particle(this.x, this.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, '#38bdf8', 3, 10));
+            }
+
+            draw() {
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                // Aura Glow
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           ENEMY CLASS (Pocong White, Pocong Red, Kuntilanak, Boss Pocong)
+           ------------------------------------------------------------- */
+        class Enemy {
+            constructor(type, x) {
+                this.type = type; // 'POCONG_WHITE', 'POCONG_RED', 'KUNTILANAK', 'BOSS'
+                this.x = x;
+                this.active = true;
+                this.jumpTimer = Math.random() * 60;
+
+                if (type === 'POCONG_WHITE') {
+                    this.w = 34;
+                    this.h = 65;
+                    this.hp = 30;
+                    this.maxHp = 30;
+                    this.speed = 1.8;
+                    this.color = '#f8fafc';
+                    this.y = GAME_HEIGHT - 80 - this.h;
+                } else if (type === 'POCONG_RED') {
+                    this.w = 36;
+                    this.h = 65;
+                    this.hp = 50;
+                    this.maxHp = 50;
+                    this.speed = 2.8;
+                    this.color = '#ef4444';
+                    this.y = GAME_HEIGHT - 80 - this.h;
+                } else if (type === 'KUNTILANAK') {
+                    this.w = 36;
+                    this.h = 60;
+                    this.hp = 40;
+                    this.maxHp = 40;
+                    this.speed = 2.2;
+                    this.color = '#e2e8f0';
+                    this.floatY = GAME_HEIGHT - 180;
+                    this.y = this.floatY;
+                    this.floatAngle = Math.random() * Math.PI * 2;
+                } else if (type === 'BOSS') {
+                    this.w = 90;
+                    this.h = 160;
+                    this.hp = 450;
+                    this.maxHp = 450;
+                    this.speed = 1.5;
+                    this.color = '#7f1d1d';
+                    this.y = GAME_HEIGHT - 80 - this.h;
+                }
+
+                this.vy = 0;
+                this.isGrounded = true;
+            }
+
+            update(player) {
+                // AI Tracking Logic
+                const dir = player.x > this.x ? 1 : -1;
+
+                if (this.type === 'KUNTILANAK') {
+                    // Flying Sine Wave
+                    this.x += dir * this.speed;
+                    this.floatAngle += 0.05;
+                    this.y = this.floatY + Math.sin(this.floatAngle) * 25;
+                } else {
+                    // Pocong Hopping Mechanics
+                    this.jumpTimer++;
+                    if (this.jumpTimer > 50 && this.isGrounded) {
+                        this.vy = this.type === 'BOSS' ? -9 : -7.5;
+                        this.isGrounded = false;
+                        this.jumpTimer = 0;
+                    }
+
+                    // Horizontal hop step
+                    if (!this.isGrounded) {
+                        this.x += dir * this.speed * 1.5;
+                    }
+
+                    // Gravity
+                    this.vy += 0.4;
+                    this.y += this.vy;
+
+                    const groundY = GAME_HEIGHT - 80;
+                    if (this.y + this.h >= groundY) {
+                        this.y = groundY - this.h;
+                        this.vy = 0;
+                        this.isGrounded = true;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+
+                if (this.type === 'POCONG_WHITE' || this.type === 'POCONG_RED' || this.type === 'BOSS') {
+                    // Pocong Shroud Body
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, this.w / 2, this.h / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Pocong Top Knot (Tali Pocong Atas)
+                    ctx.beginPath();
+                    ctx.arc(0, -this.h / 2 - 4, this.type === 'BOSS' ? 12 : 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Dark Face & Red Eyes
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(-this.w / 4, -this.h / 4, this.w / 2, 16);
+
+                    ctx.fillStyle = '#ef4444'; // Red Glowing Eyes
+                    ctx.beginPath();
+                    ctx.arc(-this.w / 8, -this.h / 4 + 8, 3, 0, Math.PI * 2);
+                    ctx.arc(this.w / 8, -this.h / 4 + 8, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.type === 'KUNTILANAK') {
+                    // Kuntilanak Flying Dress & Long Hair
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.h / 2);
+                    ctx.lineTo(this.w / 2, this.h / 2);
+                    ctx.lineTo(-this.w / 2, this.h / 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Long Black Hair
+                    ctx.fillStyle = '#090d16';
+                    ctx.fillRect(-this.w / 2, -this.h / 2, this.w, 35);
+
+                    // Red Face Glow
+                    ctx.fillStyle = '#dc2626';
+                    ctx.beginPath();
+                    ctx.arc(0, -this.h / 4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           POWER-UP CLASS (Kemenyan Health & Jimat Damage)
+           ------------------------------------------------------------- */
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'HEALTH' or 'JIMAT'
+                this.w = 24;
+                this.h = 24;
+                this.active = true;
+                this.bounceAngle = 0;
+            }
+
+            update() {
+                this.bounceAngle += 0.05;
+                this.y += Math.sin(this.bounceAngle) * 0.3;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                if (this.type === 'HEALTH') {
+                    // Kemenyan Health (Green Bottle Glow)
+                    ctx.fillStyle = '#10b981';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('➕', -5, 4);
+                } else {
+                    // Jimat Mistik (Amber Charm)
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillRect(-8, -10, 16, 20);
+                    ctx.fillStyle = '#78350f';
+                    ctx.font = '10px font-creepster';
+                    ctx.fillText('符', -4, 4);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           PARTICLE EFFECTS CLASS
+           ------------------------------------------------------------- */
+        class Particle {
+            constructor(x, y, vx, vy, color, radius, life) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.radius = radius;
+                this.life = life;
+                this.maxLife = life;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Global Game Arrays
+        const player = new Player();
+        let bullets = [];
+        let enemies = [];
+        let powerups = [];
+        let particles = [];
+
+        let totalEnemiesSpawned = 0;
+        let totalEnemiesDefeated = 0;
+        let bossRef = null;
+
+        /* -------------------------------------------------------------
+           LEVEL INITIALIZATION & ENEMIES SPAWNER
+           ------------------------------------------------------------- */
+        function initLevel(levelNum) {
+            currentLevel = levelNum;
+            const config = LEVEL_CONFIGS[levelNum];
+            
+            bullets = [];
+            enemies = [];
+            powerups = [];
+            particles = [];
+            totalEnemiesSpawned = 0;
+            totalEnemiesDefeated = 0;
+            bossRef = null;
+
+            player.reset();
+
+            // Spawn Initial Waves
+            const spawnCount = config.enemyCount;
+            for (let i = 0; i < spawnCount; i++) {
+                const type = config.types[Math.floor(Math.random() * config.types.length)];
+                const spawnX = 350 + Math.random() * (GAME_WIDTH - 400);
+                enemies.push(new Enemy(type, spawnX));
+                totalEnemiesSpawned++;
+            }
+
+            // Spawn Boss if Level 3
+            if (config.boss) {
+                bossRef = new Enemy('BOSS', GAME_WIDTH - 160);
+                enemies.push(bossRef);
+                totalEnemiesSpawned++;
+                document.getElementById('boss-hud').classList.remove('hidden');
+                document.getElementById('boss-hud').classList.add('flex');
+            } else {
+                document.getElementById('boss-hud').classList.add('hidden');
+                document.getElementById('boss-hud').classList.remove('flex');
+            }
+
+            updateHUD();
+        }
+
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 4;
+                particles.push(new Particle(
+                    x, y,
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed,
+                    color,
+                    2 + Math.random() * 3,
+                    20 + Math.random() * 15
+                ));
+            }
+        }
+
+        /* -------------------------------------------------------------
+           PARALLAX BACKGROUND & ENVIRONMENT DRAWING
+           ------------------------------------------------------------- */
+        function drawBackground() {
+            const config = LEVEL_CONFIGS[currentLevel];
+
+            // Background Sky Color
+            ctx.fillStyle = config.bgColor;
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Glowing Full Moon
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(GAME_WIDTH - 150, 100, 45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.15)';
+            ctx.beginPath();
+            ctx.arc(GAME_WIDTH - 150, 100, 65, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Parallax Silhouettes (Pohon Bambu & Batu Nisan)
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+            for (let i = 0; i < 8; i++) {
+                const bx = (i * 140) % GAME_WIDTH;
+                ctx.fillRect(bx, GAME_HEIGHT - 220, 12, 140); // Bambu Trunk
+                // Tombstones
+                if (i % 2 === 0) {
+                    ctx.beginPath();
+                    ctx.roundRect(bx + 40, GAME_HEIGHT - 120, 24, 40, [8, 8, 0, 0]);
+                    ctx.fill();
+                }
+            }
+
+            // Ground Platform
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, GAME_HEIGHT - 80, GAME_WIDTH, 80);
+            ctx.fillStyle = '#052e16';
+            ctx.fillRect(0, GAME_HEIGHT - 80, GAME_WIDTH, 8); // Green Grass Line
+
+            // Mystical Fog Effect
+            ctx.fillStyle = config.fogColor;
+            ctx.fillRect(0, GAME_HEIGHT - 120, GAME_WIDTH, 40);
+        }
+
+        /* -------------------------------------------------------------
+           COLLISION DETECTION & UPDATE LOOP
+           ------------------------------------------------------------- */
+        function updateGame() {
+            if (gameState !== 'PLAYING') return;
+
+            // Update Player
+            player.update();
+
+            // Update Bullets
+            bullets.forEach(b => b.update());
+            bullets = bullets.filter(b => b.active);
+
+            // Update Powerups
+            powerups.forEach(p => {
+                p.update();
+                // Check Pickup by Player
+                if (Math.hypot((player.x + player.w / 2) - p.x, (player.y + player.h / 2) - p.y) < 30) {
+                    p.active = false;
+                    sounds.playPowerup();
+                    if (p.type === 'HEALTH') {
+                        player.hp = Math.min(player.maxHp, player.hp + 35);
+                    } else {
+                        player.powerupTimer = 360; // ~6 Seconds of double damage
+                    }
+                    updateHUD();
+                }
+            });
+            powerups = powerups.filter(p => p.active);
+
+            // Update Enemies
+            enemies.forEach(enemy => {
+                enemy.update(player);
+
+                // Bullet vs Enemy Collision
+                bullets.forEach(bullet => {
+                    if (bullet.x > enemy.x && bullet.x < enemy.x + enemy.w &&
+                        bullet.y > enemy.y && bullet.y < enemy.y + enemy.h) {
+                        
+                        bullet.active = false;
+                        enemy.hp -= bullet.damage;
+                        sounds.playHit();
+                        createExplosion(bullet.x, bullet.y, '#ef4444', 8);
+
+                        // Enemy Defeated
+                        if (enemy.hp <= 0 && enemy.active) {
+                            enemy.active = false;
+                            sounds.playEnemyDeath();
+                            createExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, enemy.color, 25);
+                            score += enemy.type === 'BOSS' ? 500 : 100;
+                            totalEnemiesDefeated++;
+
+                            // Drop Powerup Chance
+                            if (Math.random() < 0.35) {
+                                const type = Math.random() < 0.5 ? 'HEALTH' : 'JIMAT';
+                                powerups.push(new PowerUp(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, type));
+                            }
+                        }
+                    }
+                });
+
+                // Enemy vs Player Collision (Damage Player)
+                if (enemy.active &&
+                    player.x < enemy.x + enemy.w &&
+                    player.x + player.w > enemy.x &&
+                    player.y < enemy.y + enemy.h &&
+                    player.y + player.h > enemy.y) {
+                    
+                    player.hp -= enemy.type === 'BOSS' ? 1.5 : 0.8;
+                    triggerScreenShake();
+                    sounds.playHit();
+                    if (player.hp <= 0) {
+                        player.hp = 0;
+                        gameOver();
+                    }
+                    updateHUD();
+                }
+            });
+
+            enemies = enemies.filter(e => e.active);
+
+            // Particles Update
+            particles.forEach(p => p.update());
+            particles = particles.filter(p => p.life > 0);
+
+            // Check Boss HP Status
+            if (bossRef && bossRef.active) {
+                const bossHpPct = Math.max(0, (bossRef.hp / bossRef.maxHp) * 100);
+                document.getElementById('boss-hp-bar').style.width = `${bossHpPct}%`;
+            }
+
+            // Check Victory Condition for Level
+            if (enemies.length === 0) {
+                levelVictory();
+            }
+
+            updateHUD();
+        }
+
+        /* -------------------------------------------------------------
+           DRAWING & RENDER LOOP
+           ------------------------------------------------------------- */
+        function drawGame() {
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            drawBackground();
+
+            // Draw Entities
+            powerups.forEach(p => p.draw());
+            enemies.forEach(e => e.draw());
+            player.draw();
+            bullets.forEach(b => b.draw());
+            particles.forEach(p => p.draw());
+        }
+
+        /* -------------------------------------------------------------
+           HUD & UI UPDATERS
+           ------------------------------------------------------------- */
+        function updateHUD() {
+            // HP Bar
+            const hpPct = Math.max(0, (player.hp / player.maxHp) * 100);
+            document.getElementById('hp-bar').style.width = `${hpPct}%`;
+            document.getElementById('hp-text').innerText = Math.ceil(player.hp);
+
+            // Score & Enemy Count
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('level-display').innerText = currentLevel;
+            document.getElementById('enemy-display').innerText = `${totalEnemiesDefeated}/${totalEnemiesSpawned}`;
+
+            // Powerup Badge
+            const badge = document.getElementById('powerup-badge');
+            if (player.powerupTimer > 0) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        /* -------------------------------------------------------------
+           GAME OVER & LEVEL VICTORY CONTROLLERS
+           ------------------------------------------------------------- */
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            sounds.stopBGM();
+            sounds.playGameOver();
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pocong_hunter_highscore', highScore);
+                document.getElementById('highscore-display').innerText = highScore;
+            }
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-level').innerText = currentLevel;
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+            document.getElementById('gameover-overlay').classList.remove('hidden');
+        }
+
+        function levelVictory() {
+            gameState = 'VICTORY';
+            sounds.stopBGM();
+            sounds.playVictory();
+
+            const isLastLevel = currentLevel >= 3;
+            document.getElementById('victory-title').innerText = isLastLevel ? 'TAMAT! KAMU MENANG!' : 'LEVEL SELESAI!';
+            document.getElementById('victory-msg').innerText = isLastLevel ? 
+                'Selamat! Kamu telah membasmi Raja Pocong dan menyelamatkan seluruh desa!' : 
+                'Area ini telah dibersihkan! Bersiaplah menuju level berikutnya yang lebih mencekam.';
+            
+            document.getElementById('next-level-btn').innerText = isLastLevel ? 'MAIN LAGI' : 'LANJUTKAN LEVEL';
+
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+            document.getElementById('victory-overlay').classList.remove('hidden');
+        }
+
+        /* -------------------------------------------------------------
+           INPUT CONTROLLERS (KEYBOARD & TOUCH)
+           ------------------------------------------------------------- */
+        // Keyboard Controls
+        window.addEventListener('keydown', (e) => {
+            sounds.init();
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') keys.up = true;
+            if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') keys.shoot = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = false;
+            if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') keys.up = false;
+            if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') keys.shoot = false;
+        });
+
+        // Touch Control Binding Helper
+        function bindTouchBtn(id, keyProp) {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sounds.init();
+                keys[keyProp] = true;
+            });
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[keyProp] = false;
+            });
+        }
+
+        bindTouchBtn('btn-left', 'left');
+        bindTouchBtn('btn-right', 'right');
+        bindTouchBtn('btn-jump', 'up');
+        bindTouchBtn('btn-shoot', 'shoot');
+
+        // Mouse Click Shooting Support
+        canvas.addEventListener('mousedown', () => {
+            sounds.init();
+            keys.shoot = true;
+        });
+        canvas.addEventListener('mouseup', () => {
+            keys.shoot = false;
+        });
+
+        /* -------------------------------------------------------------
+           UI BUTTON INTERACTION HANDLERS
+           ------------------------------------------------------------- */
+        document.getElementById('start-btn').addEventListener('click', () => {
+            sounds.init();
+            score = 0;
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+            gameState = 'PLAYING';
+            initLevel(1);
+            sounds.startBGM();
+        });
+
+        document.getElementById('howto-btn').addEventListener('click', () => {
+            document.getElementById('howto-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('close-howto-btn').addEventListener('click', () => {
+            document.getElementById('howto-modal').classList.add('hidden');
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            sounds.init();
+            score = 0;
+            document.getElementById('gameover-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+            gameState = 'PLAYING';
+            initLevel(1);
+            sounds.startBGM();
+        });
+
+        document.getElementById('next-level-btn').addEventListener('click', () => {
+            sounds.init();
+            document.getElementById('victory-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            if (currentLevel < 3) {
+                gameState = 'PLAYING';
+                initLevel(currentLevel + 1);
+                sounds.startBGM();
+            } else {
+                // Game Finished - Back to main menu
+                score = 0;
+                document.getElementById('menu-overlay').classList.remove('hidden');
+                document.getElementById('hud').classList.add('hidden');
+                document.getElementById('touch-controls').classList.add('hidden');
+                gameState = 'MENU';
+            }
+        });
+
+        // Sound Mute Toggle
+        document.getElementById('sound-btn').addEventListener('click', () => {
+            sounds.init();
+            sounds.muted = !sounds.muted;
+            document.getElementById('sound-btn').innerText = sounds.muted ? '🔇 Sound: OFF' : '🔊 Sound: ON';
+            if (sounds.muted) {
+                sounds.stopBGM();
+            } else if (gameState === 'PLAYING') {
+                sounds.startBGM();
+            }
+        });
+
+        /* -------------------------------------------------------------
+           MAIN GAME LOOP
+           ------------------------------------------------------------- */
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start Loop on Load
+        window.onload = function() {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
+```
